@@ -18,7 +18,7 @@ Bash
 pip install requests beautifulsoup4
 Usage:
 
-Run the script:
+**Run the script:**
 
 Bash
 python landing_page_reader.py
