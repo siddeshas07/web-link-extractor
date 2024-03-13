@@ -92,7 +92,7 @@ class LandingPageReader:
     else:
       print(f"No links found on {self.url}")
 
-# Example usage
+
 reader = LandingPageReader()
 reader.get_user_input()
 reader.display_categorized_links()
