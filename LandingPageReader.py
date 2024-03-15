@@ -1,6 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 import time
+import json
+
 
 class LandingPageReader:
   """
@@ -25,46 +27,73 @@ class LandingPageReader:
 
   def retrieve_page(self):
     """
-    Fetches the content of the landing page with retries and timeouts.
+    Fetches the content of the URL with retries and timeouts.
     """
-    for attempt in range(self.max_retries + 1):
-      try:
-        # Ensure URL has a trailing slash for requests library (if not already present)
-        if not self.url.endswith("/"):
-          self.url += "/"
-        response = requests.get(self.url, timeout=self.timeout)
-        response.raise_for_status()  # Raise exception for unsuccessful requests
-        self.content = response.content
-        return  # Successful retrieval, exit the loop
-      except requests.exceptions.RequestException as e:
-        if attempt == self.max_retries:
-          print(f"Error retrieving page after {self.max_retries} attempts: {e}")
-          return  # All retries exhausted, exit the loop
-        else:
-          print(f"Error retrieving page (attempt {attempt+1}/{self.max_retries}): {e}")
-          time.sleep(2)  # Wait 2 seconds before retry
+    for attempt in range(self.max_retries + 1):  # Ensure colon after loop condition
+        try:
+            # Ensure URL has a trailing slash for requests library (if not already present)
+            # if not self.url.endswith("/"):
+            #     self.url += "/"
+            response = requests.get(self.url, timeout=self.timeout)
+            response.raise_for_status()  # Raise exception for unsuccessful requests
+            self.content = response.content
+            # Check content type (HTML or JSON) and set data type accordingly
+            content_type = response.headers.get("Content-Type")
+            if content_type and "json" in content_type.lower():
+                self.data_type = "json"
+            else:
+                self.data_type = "html"
+            return  # Successful retrieval, exit the loop
+        except requests.exceptions.RequestException as e:
+            if attempt == self.max_retries:
+                print(f"Error retrieving data after {self.max_retries} attempts: {e}")
+                return  # All retries exhausted, exit the loop
+            else:
+                print(f"Error retrieving data (attempt {attempt+1}/{self.max_retries}): {e}")
+                time.sleep(2)  # Wait 2 seconds before retry
 
   def get_categorized_links(self):
-    """
-    Parses the landing page content, extracts links, and categorizes them.
-    """
-    if self.content is None:
-      self.retrieve_page()
+            """
+            Parses the content, extracts links (if applicable), and categorizes them.
+            """
+            if self.content is None:
+                self.retrieve_page()
 
-    if self.content:
-      soup = BeautifulSoup(self.content, "html.parser")
-      categorized_links = {}
-      for a in soup.find_all("a", href=True):
-        link = a["href"]
-        # Handle relative URLs (starting without http or https)
-        if not link.startswith("http"):
-          link = self.url + link  # Prepend base URL for relative links
-        category = self.categorize_link(link, a.text.lower())  # Analyze link and text for category
-        if category:
-          categorized_links.setdefault(category, []).append(link)
-      return categorized_links
-    else:
-      return {}
+            if self.content:
+                if self.data_type == "html":  # Handle HTML content
+                    soup = BeautifulSoup(self.content, "html.parser")
+                    categorized_links = {}
+                    for a in soup.find_all("a", href=True):
+                        link = a["href"]
+                        # Handle relative URLs (starting without http or https)
+                        if not link.startswith("http"):
+                            link = self.url + link
+                        category = self.categorize_link(link, a.text.lower())
+                        if category:
+                            categorized_links.setdefault(category, []).append(link)
+                    return categorized_links
+                elif self.data_type == "json":  # Handle JSON content
+                    json_data = json.loads(self.content)
+                    links = json_data.get("links")  # Access the list of links objects
+                    if links:
+                      categorized_links = {}
+                      for link in links:
+                          category = link.get("type")  
+                          if category:
+                              categorized_links.setdefault(category, []).append(link.get("href"))
+                      return categorized_links  # Now return categorized links
+                    else:
+                      print("No links found in JSON data")
+                      return {}
+                else:
+                    print(f"Unsupported data type: {self.data_type}")
+                    return {}  # Return empty dictionary for unsupported data types
+            else:
+                return {}  # Return empty dictionary if no content retrieved
+
+              
+        
+          
 
   def categorize_link(self, link, text):
     """
